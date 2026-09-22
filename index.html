@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tam İsabet</title>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-KFMPHREFX8"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-KFMPHREFX8');
+  function trackEvent(name, params){
+    try { if(typeof gtag === 'function') gtag('event', name, params||{}); } catch(e){}
+  }
+</script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#07080f; touch-action:none; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #game {
+    position:relative;
+    width:100%; height:100%; max-width:480px; max-height:900px;
+    background: radial-gradient(circle at 50% 30%, #14172b 0%, #07080f 70%);
+    overflow:hidden;
+  }
+  canvas { display:block; width:100%; height:100%; }
+
+  .shake { animation: shakeAnim 0.25s; }
+  @keyframes shakeAnim {
+    0%,100% { transform: translate(0,0); }
+    20% { transform: translate(-6px,3px); }
+    40% { transform: translate(6px,-3px); }
+    60% { transform: translate(-4px,-2px); }
+    80% { transform: translate(4px,2px); }
+  }
+
+  #topbar {
+    position:absolute; top:0; left:0; right:0;
+    display:flex; justify-content:space-between; align-items:center;
+    padding:16px 18px; z-index:5; pointer-events:none;
+  }
+  #hearts { display:flex; gap:6px; font-size:22px; filter:drop-shadow(0 0 4px rgba(255,60,90,.6)); }
+  .heart-dead { opacity:.2; filter:none; }
+  #stats { display:flex; gap:14px; align-items:center; }
+  .pill {
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
+    padding:6px 12px; border-radius:20px; font-size:14px; color:#fff;
+    display:flex; align-items:center; gap:6px; backdrop-filter: blur(6px);
+  }
+  #adBtn {
+    position:absolute; top:66px; right:18px; z-index:5;
+    background:linear-gradient(135deg,#ff8a3d,#ff3d77);
+    border:none; color:#fff; font-size:12px; font-weight:600;
+    padding:8px 12px; border-radius:14px; pointer-events:auto;
+    box-shadow:0 4px 14px rgba(255,61,119,.4);
+  }
+  #adBtn:disabled { opacity:.35; filter:grayscale(1); }
+
+  #combo {
+    position:absolute; left:50%; top:38%; transform:translate(-50%,-50%);
+    font-size:15px; font-weight:700; color:#7dffc4; opacity:0;
+    text-shadow:0 0 10px rgba(125,255,196,.7); z-index:4; pointer-events:none;
+    transition: opacity .15s;
+  }
+
+  #centerHint {
+    position:absolute; left:50%; bottom:14%; transform:translateX(-50%);
+    color:rgba(255,255,255,.5); font-size:13px; z-index:3; pointer-events:none;
+    letter-spacing:.5px;
+  }
+
+  .overlay {
+    position:absolute; inset:0; background:rgba(4,5,12,.86);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    z-index:10; gap:14px; padding:24px; text-align:center;
+    backdrop-filter: blur(3px);
+  }
+  .hidden { display:none !important; }
+  .overlay h1 { color:#fff; font-size:26px; margin-bottom:4px; }
+  .overlay h2 { color:#fff; font-size:22px; }
+  .overlay p { color:rgba(255,255,255,.6); font-size:14px; max-width:280px; line-height:1.5; }
+  .bigscore { font-size:44px; font-weight:800; color:#fff; text-shadow:0 0 20px rgba(125,255,196,.5); }
+  .best { color:#ffd166; font-size:14px; }
+
+  .btn {
+    border:none; border-radius:16px; padding:14px 22px; font-size:15px;
+    font-weight:700; color:#fff; width:260px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    box-shadow:0 6px 18px rgba(0,0,0,.35);
+  }
+  .btn:active { transform:scale(.97); }
+  .btn-primary { background:linear-gradient(135deg,#5eead4,#3b82f6); }
+  .btn-ad { background:linear-gradient(135deg,#ff8a3d,#ff3d77); }
+  .btn-coin { background:linear-gradient(135deg,#ffd166,#ff9f43); color:#3a2200; }
+  .btn-ghost { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); }
+  .btn:disabled { opacity:.35; filter:grayscale(.6); }
+
+  .spinner {
+    width:22px; height:22px; border-radius:50%;
+    border:3px solid rgba(255,255,255,.3); border-top-color:#fff;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  #debugBanner { position:absolute; left:10px; right:10px; bottom:10px; z-index:99; background:#3a0d14; border:1px solid #ff5577; color:#ffb3c1; font-size:11px; line-height:1.4; padding:10px 12px; border-radius:10px; font-family:monospace; white-space:pre-wrap; word-break:break-word; max-height:35%; overflow:auto; }
+</style>
+</head>
+<body>
+<div id="game" class="shakeTarget">
+  <canvas id="canvas"></canvas>
+
+  <div id="topbar">
+    <div id="hearts"></div>
+    <div id="stats">
+      <div class="pill">🏁 <span id="levelLbl">1</span></div>
+      <div class="pill">⭐ <span id="scoreLbl">0</span></div>
+      <div class="pill">💎 <span id="coinLbl">0</span></div>
+    </div>
+  </div>
+
+  <button id="adBtn">🎬 +30 Jeton</button>
+  <button id="muteBtn" style="position:absolute; top:116px; left:18px; z-index:6; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#fff; font-size:16px; padding:8px 10px; border-radius:14px;">🔊</button>
+  <div id="combo"></div>
+  <div id="centerHint">Boşluk beyaz noktaya gelince dokun</div>
+
+  <div id="startOverlay" class="overlay">
+    <h1>🎯 Tam İsabet</h1>
+    <p>Dönen halkanın boşluğu tam üst noktaya geldiği anda ekrana dokun. Ne kadar çok art arda tutturursan o kadar hızlanır!</p>
+    <div class="best">En iyi skor: <span id="bestStart">0</span></div>
+    <button class="btn btn-primary" id="startBtn">▶ Başla</button>
+  </div>
+
+  <div id="overOverlay" class="overlay hidden">
+    <h2>Oyun Bitti</h2>
+    <div class="bigscore" id="finalScore">0</div>
+    <div class="best">En iyi: <span id="bestOver">0</span> · +<span id="coinsEarnedLbl">0</span> 💎 kazandın</div>
+    <button class="btn btn-ad" id="watchAdBtn">🎬 Reklam İzle → +1 Can</button>
+    <button class="btn btn-coin" id="buyLifeBtn">💎 40 Jeton ile Can Al</button>
+    <button class="btn btn-ghost" id="restartBtn">🔄 Yeniden Başla</button>
+  </div>
+
+  <div id="adOverlay" class="overlay hidden">
+    <div class="spinner"></div>
+    <p>Reklam oynatılıyor...</p>
+  </div>
+
+  <div id="debugBanner" class="hidden"></div>
+</div>
+
+<script>
+function showDebugError(msg){
+  const el = document.getElementById('debugBanner');
+  if(!el) return;
+  el.textContent = '⚠ ' + msg;
+  el.classList.remove('hidden');
+}
+window.addEventListener('error', (e)=>{
+  showDebugError((e.message||'bilinmeyen hata') + '\n' + (e.filename?(e.filename+':'+e.lineno+':'+e.colno):'') + (e.error && e.error.stack ? ('\n'+e.error.stack) : ''));
+});
+window.addEventListener('unhandledrejection', (e)=>{
+  const r = e.reason;
+  showDebugError('Promise hatası: ' + (r && r.message ? r.message : String(r)) + (r && r.stack ? ('\n'+r.stack) : ''));
+});
+
+(async function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const gameEl = document.getElementById('game');
+  let W,H,DPR;
+
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio||1, 2);
+    const r = gameEl.getBoundingClientRect();
+    W = r.width; H = r.height;
+    canvas.width = W*DPR; canvas.height = H*DPR;
+    canvas.style.width = W+'px'; canvas.style.height = H+'px';
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ---------- persistent storage ----------
+  let coins = 0, best = 0;
+  async function loadStorage(){
+    try { const c = localStorage.getItem('ti_coins'); if(c!==null) coins = JSON.parse(c); } catch(e){}
+    try { const b = localStorage.getItem('ti_best'); if(b!==null) best = JSON.parse(b); } catch(e){}
+    document.getElementById('coinLbl').textContent = coins;
+    document.getElementById('bestStart').textContent = best;
+  }
+  async function saveCoins(){ try{ localStorage.setItem('ti_coins', JSON.stringify(coins)); }catch(e){} }
+  async function saveBest(){ try{ localStorage.setItem('ti_best', JSON.stringify(best)); }catch(e){} }
+  await loadStorage();
+
+  // ---------- sound (generated, no asset files) ----------
+  let audioCtx = null;
+  let muted = false;
+  try { muted = localStorage.getItem('ti_muted') === '1'; } catch(e){}
+  function updateMuteBtn(){
+    const b = document.getElementById('muteBtn');
+    if(b) b.textContent = muted ? '🔇' : '🔊';
+  }
+  function ensureAudio(){
+    if(muted) return;
+    if(!audioCtx){
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){}
+    }
+    if(audioCtx && audioCtx.state === 'suspended'){ try{ audioCtx.resume(); }catch(e){} }
+  }
+  function beep(freq, duration, type, startDelay, peak){
+    if(muted || !audioCtx) return;
+    const t0 = audioCtx.currentTime + (startDelay||0);
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(peak||0.22, t0+0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0+duration);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t0); osc.stop(t0+duration+0.03);
+  }
+  function playHitSound(comboN){
+    const freq = 520 + Math.min(comboN,20)*18;
+    beep(freq, 0.12, 'sine', 0, 0.22);
+    beep(freq*1.5, 0.08, 'sine', 0.03, 0.12);
+  }
+  function playFailSound(){
+    beep(160, 0.22, 'sawtooth', 0, 0.18);
+    beep(110, 0.25, 'sawtooth', 0.05, 0.14);
+  }
+  function playLevelUpSound(){
+    beep(660, 0.12, 'triangle', 0, 0.2);
+    beep(880, 0.12, 'triangle', 0.1, 0.2);
+    beep(1100, 0.18, 'triangle', 0.2, 0.22);
+  }
+
+  // ---------- game state ----------
+  const MAX_LIVES = 3;
+  let lives, score, combo, running;
+  let revivePrice = 40;
+  let adRevivesUsed = 0;
+  const MAX_AD_REVIVES = 2;
+  let baseSpeed, baseGap;
+  let rings = [];
+  let markerOffset = 0, markerVel = 0, markerVelTimer = 0;
+  let flash = 0; // >0 green, <0 red
+  let particles = [];
+  let adCooldown = 0;
+  let zoomPulse = 0;
+  let level = 1;
+
+  const PALETTES = [
+    ['#4facfe','#a06bff'],
+    ['#f472b6','#fb923c'],
+    ['#4ade80','#22d3ee'],
+    ['#facc15','#f87171'],
+    ['#a78bfa','#60a5fa'],
+    ['#fb7185','#38bdf8']
+  ];
+  function currentPalette(){ return PALETTES[(level-1) % PALETTES.length]; }
+
+  const TOP_ANGLE = -Math.PI/2;
+
+  function cx(){ return W/2; }
+  function cy(){ return H*0.42; }
+
+  // level-gated mechanic variety: wandering target past lvl4, direction-flip past lvl6, double ring past lvl3
+  function markerMaxSpeed(){ return level >= 4 ? Math.min((level-3)*0.15, 1.3) : 0; }
+  function updateMarker(dt){
+    markerVelTimer -= dt;
+    if(markerVelTimer <= 0){
+      const maxSpeed = markerMaxSpeed();
+      markerVel = maxSpeed > 0 ? (Math.random()*2-1)*maxSpeed : 0;
+      markerVelTimer = 1.2 + Math.random()*1.8;
+    }
+    markerOffset += markerVel*dt;
+  }
+  function markerAngleNow(){ return TOP_ANGLE + markerOffset; }
+
+  function makeRing(radius, gapSize, allowFlip, speedMult, forcedDir, forcedAngle){
+    return {
+      angle: forcedAngle !== undefined ? forcedAngle : Math.random()*Math.PI*2,
+      dir: forcedDir !== undefined ? forcedDir : (Math.random() < 0.5 ? 1 : -1),
+      radius, gapSize,
+      speed: baseSpeed * speedMult,
+      willFlip: allowFlip && Math.random() < 0.4,
+      flipAt: 0.35 + Math.random()*0.55,
+      flipped: false, ageT: 0, flipPulse: 0
+    };
+  }
+
+  function spawnRings(keepDifficulty){
+    if(!keepDifficulty){
+      baseSpeed = 1.1;
+      baseGap = 0.9;
+    }
+    const outerR = Math.min(W,H)*0.24;
+    const allowFlip = level >= 6;
+    const doubleChance = level >= 3 ? 0.35 : 0;
+    const isDouble = Math.random() < doubleChance;
+    if(isDouble){
+      // Two rings must line up at the same instant. Constructing them with a
+      // guaranteed relationship (same direction, an exact 2x speed ratio, and
+      // both centered on the target at spawn) mathematically guarantees they
+      // realign periodically forever — leaving it to random initial phases
+      // could make alignment rare or, with equal speeds, permanently impossible.
+      const outerGap = baseGap*1.1, innerGap = baseGap*1.4;
+      const target0 = markerAngleNow();
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      const outer = makeRing(outerR, outerGap, false, 0.6, dir, target0 - outerGap/2);
+      const inner = makeRing(outerR*0.55, innerGap, false, 1.2, dir, target0 - innerGap/2);
+      rings = [outer, inner];
+    } else {
+      rings = [ makeRing(outerR, baseGap, allowFlip, 1, undefined) ];
+    }
+  }
+
+  function levelForScore(s){ return 1 + Math.floor(s/15); }
+
+  function newGame(){
+    ensureAudio();
+    trackEvent('game_start');
+    lives = MAX_LIVES;
+    score = 0; combo = 0;
+    running = true;
+    level = 1;
+    revivePrice = 40;
+    adRevivesUsed = 0;
+    coins = 0; // fresh economy each run — only the best score persists across runs
+    saveCoins();
+    markerOffset = 0; markerVel = 0; markerVelTimer = 0;
+    spawnRings(false);
+    particles = [];
+    document.getElementById('levelLbl').textContent = level;
+    document.getElementById('coinLbl').textContent = coins;
+    updateHearts();
+    document.getElementById('scoreLbl').textContent = score;
+    document.getElementById('overOverlay').classList.add('hidden');
+    document.getElementById('startOverlay').classList.add('hidden');
+  }
+
+  function updateHearts(){
+    const h = document.getElementById('hearts');
+    h.innerHTML = '';
+    for(let i=0;i<MAX_LIVES;i++){
+      const s = document.createElement('span');
+      s.textContent = '❤️';
+      if(i >= lives) s.classList.add('heart-dead');
+      h.appendChild(s);
+    }
+  }
+
+  function shakeScreen(){
+    gameEl.classList.remove('shake');
+    void gameEl.offsetWidth;
+    gameEl.classList.add('shake');
+  }
+
+  function spawnParticles(x,y,color){
+    for(let i=0;i<14;i++){
+      const a = Math.random()*Math.PI*2;
+      const sp = 1+Math.random()*3;
+      particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:1,color});
+    }
+  }
+
+  function showCombo(text){
+    const el = document.getElementById('combo');
+    el.textContent = text;
+    el.style.opacity = 1;
+    clearTimeout(showCombo._t);
+    showCombo._t = setTimeout(()=>{ el.style.opacity = 0; }, 500);
+  }
+
+  async function loseLife(){
+    lives--; flash = -1; shakeScreen(); combo = 0; updateHearts();
+    if(navigator.vibrate) try{ navigator.vibrate(60);}catch(e){}
+    if(lives <= 0){
+      running = false;
+      trackEvent('game_over', { score: score, level: level });
+      if(score > best){ best = score; await saveBest(); }
+      document.getElementById('finalScore').textContent = score;
+      document.getElementById('bestOver').textContent = best;
+      const earned = Math.floor(score/5);
+      document.getElementById('coinsEarnedLbl').textContent = earned;
+      coins += earned;
+      document.getElementById('coinLbl').textContent = coins;
+      await saveCoins();
+      document.getElementById('buyLifeBtn').textContent = '💎 ' + revivePrice + ' Jeton ile Can Al';
+      document.getElementById('buyLifeBtn').disabled = coins < revivePrice;
+      const adBtnOver = document.getElementById('watchAdBtn');
+      if(adRevivesUsed >= MAX_AD_REVIVES){
+        adBtnOver.disabled = true;
+        adBtnOver.textContent = '🎬 Reklam Hakkı Bitti';
+      } else {
+        adBtnOver.disabled = false;
+        adBtnOver.textContent = '🎬 Reklam İzle → +1 Can';
+      }
+      document.getElementById('overOverlay').classList.remove('hidden');
+    }
+  }
+
+  function tryThread(){
+    if(!running) return;
+    const now = performance.now();
+    const target = ((markerAngleNow() % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
+    let allHit = true;
+    rings.forEach(ring=>{
+      const a0 = ((ring.angle % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
+      const a1 = a0 + ring.gapSize;
+      let hit;
+      if(a1 <= Math.PI*2){ hit = target >= a0 && target <= a1; }
+      else { hit = target >= a0 || target <= (a1 - Math.PI*2); }
+      if(!hit) allHit = false;
+    });
+
+    const mAngle = markerAngleNow();
+    const outer = rings[0];
+    const burstX = cx() + Math.cos(mAngle)*outer.radius;
+    const burstY = cy() + Math.sin(mAngle)*outer.radius;
+
+    if(allHit){
+      combo++;
+      const bonus = rings.length>1 ? 2 : 0;
+      const gained = 1 + Math.floor(combo/5) + bonus;
+      score += gained;
+      document.getElementById('scoreLbl').textContent = score;
+      flash = 1;
+      zoomPulse = 1;
+      spawnParticles(burstX, burstY, '#7dffc4');
+      playHitSound(combo);
+      if(combo>1) showCombo('x'+combo+' COMBO!');
+      if(combo % 4 === 0){
+        coins += 2; // small trickle so coins feel alive during play, without flooding
+        document.getElementById('coinLbl').textContent = coins;
+        saveCoins();
+      }
+      const newLevel = levelForScore(score);
+      if(newLevel > level){
+        level = newLevel;
+        document.getElementById('levelLbl').textContent = level;
+        coins += 6;
+        document.getElementById('coinLbl').textContent = coins;
+        saveCoins();
+        showCombo('🏁 Seviye ' + level + '!');
+        playLevelUpSound();
+        trackEvent('level_up', { level: level });
+      }
+      baseSpeed = Math.min(baseSpeed + 0.055, 4.2);
+      baseGap = Math.max(baseGap - 0.02, 0.42);
+      spawnRings(true);
+    } else {
+      spawnParticles(burstX, burstY, '#ff5577');
+      playFailSound();
+      loseLife();
+    }
+  }
+
+  canvas.addEventListener('pointerdown', (e)=>{
+    if(!running) return;
+    tryThread();
+  });
+
+  // ---------- render loop ----------
+  let last = performance.now();
+  let errorShown = false;
+  function frameStep(now){
+    const dt = Math.min((now-last)/1000, 0.05);
+    last = now;
+    ctx.clearRect(0,0,W,H);
+
+    if(running){
+      if(rings.length < 2) updateMarker(dt); // freeze the wandering target during double-ring rounds so the alignment guarantee holds
+      rings.forEach(ring=>{
+        ring.angle += ring.speed * ring.dir * dt;
+        ring.ageT += dt;
+        if(ring.willFlip && !ring.flipped && ring.ageT >= ring.flipAt){
+          ring.dir *= -1;
+          ring.flipped = true;
+          ring.flipPulse = 1;
+        }
+        if(ring.flipPulse > 0) ring.flipPulse *= (1 - dt*5);
+      });
+    }
+
+    const x = cx(), y = cy();
+    ctx.lineWidth = Math.max(10, Math.min(W,H)*0.03);
+    ctx.lineCap = 'round';
+
+    zoomPulse *= (1 - dt*7);
+    if(zoomPulse < 0.01) zoomPulse = 0;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1 + zoomPulse*0.08, 1 + zoomPulse*0.08);
+    ctx.translate(-x, -y);
+
+    const pal = currentPalette();
+    const mAngle = markerAngleNow();
+    let markerColor = '#ffffff';
+    if(flash > 0) markerColor = '#7dffc4';
+    if(flash < 0) markerColor = '#ff5577';
+
+    rings.forEach((ring, idx)=>{
+      const r = ring.radius;
+      const solidStart = ring.angle + ring.gapSize;
+      const solidEnd = ring.angle + Math.PI*2;
+      const grad = ctx.createLinearGradient(x-r,y-r,x+r,y+r);
+      if(ring.flipPulse > 0.05){
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(1, idx===0?pal[1]:pal[0]);
+      } else {
+        grad.addColorStop(0, idx===0?pal[0]:pal[1]);
+        grad.addColorStop(1, idx===0?pal[1]:pal[0]);
+      }
+      ctx.strokeStyle = grad;
+      ctx.shadowColor = 'rgba(120,150,255,.5)';
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(x,y,r, solidStart, solidEnd);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // threading marker at this ring's radius
+      const mx = x + Math.cos(mAngle)*r;
+      const my = y + Math.sin(mAngle)*r;
+      ctx.beginPath();
+      ctx.arc(mx, my, 8, 0, Math.PI*2);
+      ctx.fillStyle = markerColor;
+      ctx.shadowColor = markerColor;
+      ctx.shadowBlur = 14;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    });
+
+    flash *= (1 - dt*6);
+    if(Math.abs(flash) < 0.02) flash = 0;
+
+    // center pin
+    ctx.beginPath();
+    ctx.arc(x,y, 4, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,255,.35)';
+    ctx.fill();
+    ctx.restore();
+
+    // particles
+    particles.forEach(p=>{
+      p.x += p.vx; p.y += p.vy; p.life -= dt*1.6;
+    });
+    particles = particles.filter(p=>p.life>0);
+    particles.forEach(p=>{
+      ctx.globalAlpha = Math.max(p.life,0);
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,3,0,Math.PI*2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+
+    requestAnimationFrame(loop);
+  }
+  function loop(now){
+    try {
+      frameStep(now);
+    } catch(e){
+      if(!errorShown){
+        errorShown = true;
+        showDebugError('frameStep: ' + (e && e.message ? e.message : String(e)) + (e && e.stack ? ('\n'+e.stack) : ''));
+      }
+      requestAnimationFrame(loop);
+    }
+  }
+  requestAnimationFrame(loop);
+
+  // ---------- UI wiring ----------
+  function safeCall(fn){
+    return function(...args){
+      try {
+        const result = fn.apply(this, args);
+        if(result && typeof result.catch === 'function'){
+          result.catch(e=>{
+            showDebugError((fn.name||'handler') + ' (async): ' + (e && e.message ? e.message : String(e)) + (e && e.stack ? ('\n'+e.stack) : ''));
+          });
+        }
+        return result;
+      }
+      catch(e){ showDebugError((fn.name||'handler') + ': ' + (e && e.message ? e.message : String(e)) + (e && e.stack ? ('\n'+e.stack) : '')); }
+    };
+  }
+
+  updateMuteBtn();
+  document.getElementById('muteBtn').onclick = safeCall(()=>{
+    muted = !muted;
+    try{ localStorage.setItem('ti_muted', muted?'1':'0'); }catch(e){}
+    updateMuteBtn();
+    if(!muted) ensureAudio();
+  });
+
+  document.getElementById('startBtn').onclick = safeCall(newGame);
+  document.getElementById('restartBtn').onclick = safeCall(newGame);
+
+  document.getElementById('watchAdBtn').onclick = safeCall(async ()=>{
+    if(adRevivesUsed >= MAX_AD_REVIVES) return;
+    trackEvent('revive_ad_watch');
+    document.getElementById('adOverlay').classList.remove('hidden');
+    await new Promise(res=>setTimeout(res, 1600));
+    document.getElementById('adOverlay').classList.add('hidden');
+    document.getElementById('overOverlay').classList.add('hidden');
+    adRevivesUsed++;
+    lives = 1; running = true; updateHearts();
+    spawnRings(true);
+  });
+
+  document.getElementById('buyLifeBtn').onclick = safeCall(async ()=>{
+    if(coins < revivePrice) return;
+    trackEvent('revive_coin_buy', { price: revivePrice });
+    coins -= revivePrice;
+    revivePrice *= 2; // next revive this run costs more — makes ads the easy option
+    document.getElementById('coinLbl').textContent = coins;
+    await saveCoins();
+    document.getElementById('overOverlay').classList.add('hidden');
+    lives = 1; running = true; updateHearts();
+    spawnRings(true);
+  });
+
+  const adBtn = document.getElementById('adBtn');
+  adBtn.onclick = safeCall(async ()=>{
+    if(adCooldown > 0) return;
+    adBtn.disabled = true;
+    document.getElementById('adOverlay').classList.remove('hidden');
+    await new Promise(res=>setTimeout(res, 1600));
+    document.getElementById('adOverlay').classList.add('hidden');
+    coins += 30;
+    document.getElementById('coinLbl').textContent = coins;
+    await saveCoins();
+    adCooldown = 20;
+    const tick = setInterval(()=>{
+      adCooldown--;
+      adBtn.textContent = adCooldown>0 ? ('⏳ '+adCooldown+'s') : '🎬 +30 Jeton';
+      if(adCooldown<=0){ clearInterval(tick); adBtn.disabled=false; }
+    },1000);
+  });
+
+  spawnRings(false);
+})();
+</script>
+</body>
+</html>
